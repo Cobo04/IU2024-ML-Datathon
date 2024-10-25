@@ -1,0 +1,1 @@
+# Global main file -> Prevent merge conflicts (terrible practice but who cares lolol)
