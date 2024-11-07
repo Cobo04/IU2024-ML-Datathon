@@ -132,6 +132,7 @@ count_negative = sum([ 1 for x in experiment_data if x[1] == 0 ])
 print(f"Positive: {count_positive}\t Negative: {count_negative}")
 print("Total reviews:", len(experiment_data))
 
+# w, b = [ 1.65087395  0.49448245 -0.0074589   0.84723613 -0.00302559  0.96924161], 0.2061591334513687
 w, b = stochastic_gradient_descent_silent(experiment_data[:50])
 print(w, b)
 
@@ -184,17 +185,17 @@ X_train, X_test, y_train, y_test  = train_test_split(
         train_size=0.80, 
         random_state=1234)
 
-# log_model = LogisticRegression(max_iter=2000)
+log_model = LogisticRegression(max_iter=3000)
 
-# log_model = log_model.fit(X=X_train, y=y_train)
+log_model = log_model.fit(X=X_train, y=y_train)
 
-# y_pred = log_model.predict(X_test)
+y_pred = log_model.predict(X_test)
 
-# print(accuracy_score(y_test, y_pred))
+print(accuracy_score(y_test, y_pred))
 
 
 # Linear Support Vector Classifier (SVC)
-lin_svc_model = LinearSVC(max_iter=5000)
-lin_svc_model = lin_svc_model.fit(X=X_train, y=y_train)
-y_pred_lin_svc = lin_svc_model.predict(X_test)
-print(accuracy_score(y_test, y_pred_lin_svc))
+# lin_svc_model = LinearSVC(max_iter=3000)
+# lin_svc_model = lin_svc_model.fit(X=X_train, y=y_train)
+# y_pred_lin_svc = lin_svc_model.predict(X_test)
+# print(accuracy_score(y_test, y_pred_lin_svc))
