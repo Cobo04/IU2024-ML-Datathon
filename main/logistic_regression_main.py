@@ -13,6 +13,7 @@ TODO
 # ===== Necessary Dependencies =====
 # ==================================
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
@@ -32,7 +33,10 @@ import zipfile
 import ast
 from sklearn import metrics
 from sklearn.neural_network import MLPClassifier, MLPRegressor
+# import nltk
 
+# nltk.download('vader_lexicon')
+# nltk.download('punkt_tab')
 # ================================================================
 # ===== General Formatting -- Data Settup and Initialization =====
 # ================================================================
@@ -190,14 +194,20 @@ def execute_model(dataList, data_labels):
             train_size=0.80, 
             random_state=1234)
 
-    log_model = LogisticRegression(max_iter=500, penalty='elasticnet', C=10, solver='saga', l1_ratio=1)
+    print("Dataset Splitting Complete")
+
+    # log_model = LogisticRegression(max_iter=500, penalty='elasticnet', C=10, solver='saga', l1_ratio=1)
+    log_model = LogisticRegression(max_iter=300, C=5, solver='lbfgs', class_weight= None)
 
     log_model = log_model.fit(X=X_train, y=y_train)
 
     y_pred = log_model.predict(X_test)
 
+    print("Start prediction with Logistic Regression model")
+
     #prediction matrix
     predictions = log_model.predict(X_test)
+    print(metrics.confusion_matrix(y_test, y_pred))
     df = pandas.DataFrame(metrics.confusion_matrix(y_test,predictions), index=['Antisimetic Actual','Not Antisimetic Actual'], columns=['Antisimetic Predicted','Not Antisimetic Predicted'])
 
     print(df)
@@ -217,7 +227,7 @@ def execute_model_MLP(dataList, data_labels):
 
 
     mlp = MLPClassifier(hidden_layer_sizes=(10, 5), max_iter=300, alpha=1e-4,
-                        solver='lbfgs', verbose=True, random_state=1,
+                        solver='adam', verbose=True, random_state=1,
                         learning_rate_init=.05, learning_rate='adaptive')
     
     mlp.fit(X_train_cv, y_train)
@@ -227,8 +237,60 @@ def execute_model_MLP(dataList, data_labels):
     print(f"Training set score: {mlp.score(X_train_cv, y_train):.5f}")
     print(f"Test set score: {mlp.score(X_test_cv, y_test):.5f}")
 
+    print(metrics.confusion_matrix(y_test, predictions))
     df = pandas.DataFrame(metrics.confusion_matrix(y_test,predictions), index=['Antisimetic Actual','Not Antisimetic Actual'], columns=['Antisimetic Predicted','Not Antisimetic Predicted'])
     print(df)
+
+def fine_tune_model_parameters(dataList, data_labels):
+
+    print("Vectorizing data")
+    vectorizer = CountVectorizer(analyzer = 'word', lowercase = True, stop_words='english', ngram_range=(1, 2), max_features=50000)
+    features = vectorizer.fit_transform(dataList)
+
+    print("Splitting data into training and testing sets...")
+    X_train, X_test, y_train, y_test = train_test_split(
+        features, 
+        data_labels,
+        train_size=0.20,  # Smaller subset for benchmarking
+        random_state=1234
+    )
+    print("Data split complete. Training samples:", X_train.shape[0], "Testing samples:", X_test.shape[0])
+
+    print("Initializing GridSearchCV with parameter grid...")
+    from sklearn.model_selection import GridSearchCV
+    params = {
+        'C': [3, 5, 7, 10],      # Fine-tuning C (best val was 5)
+        'max_iter': [100, 200],  # Allow more iterations
+        'class_weight': [None, 'balanced']
+    }
+    grid_search = GridSearchCV(LogisticRegression(warm_start=True, tol=1e-4, solver='lbfgs'), param_grid=params, cv=3, verbose=1)
+    print("Starting grid search...")
+
+    grid_search.fit(X_train, y_train)
+    print("Grid search complete.")
+    print("Best parameters found:", grid_search.best_params_)
+
+    best_model = grid_search.best_estimator_
+    print("Best model initialized with parameters:", best_model.get_params())
+
+    print("Starting prediction on the test set...")
+    y_pred = best_model.predict(X_test)
+
+    print("Evaluation metrics:")
+    print("Confusion Matrix:")
+    print(metrics.confusion_matrix(y_test, y_pred))
+
+    df = pandas.DataFrame(
+        metrics.confusion_matrix(y_test, y_pred), 
+        index=['Antisemetic Actual', 'Not Antisemetic Actual'], 
+        columns=['Antisemetic Predicted', 'Not Antisemetic Predicted']
+    )
+    print(df)
+
+    accuracy = accuracy_score(y_test, y_pred)
+    print("Accuracy of the model:", accuracy)
+
+    return accuracy
 
 # ========================================
 # ===== Automatically Generate Model =====
@@ -241,5 +303,7 @@ def auto_generate_model():
 # ===== Main =====
 # ================
 
-print(auto_generate_model())
+# print(auto_generate_model())
 # execute_model_MLP(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
+
+fine_tune_model_parameters(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
