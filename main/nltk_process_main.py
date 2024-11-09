@@ -131,7 +131,7 @@ def auto_bigram_entropy_generation(text, n=2):
     \n\nOutput [list]: Bigram Entropy of the analyzed text"""
 
     tokens = tokenize(text)
-    bigrams = generate_bigrams(tokens, n)
+    bigrams = generate_bigrams(tokens, n=n)
     bigramFD = generate_bigram_frequency_distribution(bigrams)
     bigramEntropy = output_bigram_entropy(bigramFD)
     return bigramEntropy
@@ -140,4 +140,4 @@ def auto_bigram_entropy_generation(text, n=2):
 # ===== Main =====
 # ================
 
-display_bigram_entropy_results(auto_bigram_entropy_generation(text), 20)
+display_bigram_entropy_results(auto_bigram_entropy_generation(text, 3), 20)

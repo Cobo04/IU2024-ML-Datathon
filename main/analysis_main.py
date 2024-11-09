@@ -6,6 +6,7 @@ TODO
 1. check to see if we can integrate weights and bias
 2. figure out how we merge the nltk process to our logistic regression
 3. mlp classifier (neural network) 
+4. word embeddings to neural network
 
 """
 
@@ -21,6 +22,7 @@ from sklearn.svm import LinearSVC
 from sklearn.svm import NuSVC
 from sklearn.metrics import accuracy_score
 from collections import Counter
+from sklearn.naive_bayes import GaussianNB
 import os
 import csv
 import math
@@ -33,7 +35,6 @@ import zipfile
 import ast
 from sklearn import metrics
 from sklearn.neural_network import MLPClassifier, MLPRegressor
-# import nltk
 
 # nltk.download('vader_lexicon')
 # nltk.download('punkt_tab')
@@ -197,13 +198,25 @@ def execute_model(dataList, data_labels):
     print("Dataset Splitting Complete")
 
     # log_model = LogisticRegression(max_iter=500, penalty='elasticnet', C=10, solver='saga', l1_ratio=1)
+
+    # These are the best parameters found from the function below for model initialization (0.8934)
+    # params = {'C': 3, 'class_weight': 'balanced', 'dual': False, 'fit_intercept': True, 
+    #           'intercept_scaling': 1, 'l1_ratio': None, 'max_iter': 100, 'multi_class': 'deprecated', 
+    #           'n_jobs': None, 'penalty': 'l2', 'random_state': None, 'solver': 'lbfgs', 'tol': 0.0001, 
+    #           'verbose': 0, 'warm_start': True}
+    
+    # print("Initializing Model")
+    # log_model = LogisticRegression()
+
+    # print("Loading Parameters")
+    # log_model.set_params(**params)
+
     log_model = LogisticRegression(max_iter=300, C=5, solver='lbfgs', class_weight= None)
 
+    print("Training...")
     log_model = log_model.fit(X=X_train, y=y_train)
 
     y_pred = log_model.predict(X_test)
-
-    print("Start prediction with Logistic Regression model")
 
     #prediction matrix
     predictions = log_model.predict(X_test)
@@ -224,12 +237,21 @@ def execute_model_MLP(dataList, data_labels):
     X_train_cv = cv.fit_transform(X_train)
 
     X_test_cv = cv.transform(X_test)
-
-
-    mlp = MLPClassifier(hidden_layer_sizes=(10, 5), max_iter=300, alpha=1e-4,
-                        solver='adam', verbose=True, random_state=1,
-                        learning_rate_init=.05, learning_rate='adaptive')
     
+    mlp = MLPClassifier(hidden_layer_sizes=(10, 5), max_iter=300, alpha=1e-4,
+                        solver='lbfgs', verbose=True, random_state=1,
+                        learning_rate_init=.05, learning_rate='adaptive')
+
+    # params = {'activation': 'relu', 'alpha': 0.0001, 'batch_size': 'auto', 'beta_1': 0.9, 
+    #           'beta_2': 0.999, 'early_stopping': False, 'epsilon': 1e-08, 'hidden_layer_sizes': (100,), 
+    #           'learning_rate': 'constant', 'learning_rate_init': 0.001, 'max_fun': 15000, 'max_iter': 200, 'momentum': 0.9, 
+    #           'n_iter_no_change': 10, 'nesterovs_momentum': True, 'power_t': 0.5, 'random_state': None, 'shuffle': True, 'solver': 'adam', 
+    #           'tol': 0.0001, 'validation_fraction': 0.1, 'verbose': False, 'warm_start': False}
+
+    # mlp = MLPClassifier()
+    # mlp.set_params(**params)
+    
+    print("Training...")
     mlp.fit(X_train_cv, y_train)
 
     predictions = mlp.predict(X_test_cv)
@@ -244,7 +266,7 @@ def execute_model_MLP(dataList, data_labels):
 def fine_tune_model_parameters(dataList, data_labels):
 
     print("Vectorizing data")
-    vectorizer = CountVectorizer(analyzer = 'word', lowercase = True, stop_words='english', ngram_range=(1, 2), max_features=50000)
+    vectorizer = CountVectorizer(analyzer = 'word', lowercase = True, stop_words='english', ngram_range=(1, 3), max_features=50000)
     features = vectorizer.fit_transform(dataList)
 
     print("Splitting data into training and testing sets...")
@@ -263,7 +285,9 @@ def fine_tune_model_parameters(dataList, data_labels):
         'max_iter': [100, 200],  # Allow more iterations
         'class_weight': [None, 'balanced']
     }
-    grid_search = GridSearchCV(LogisticRegression(warm_start=True, tol=1e-4, solver='lbfgs'), param_grid=params, cv=3, verbose=1)
+    params = {}
+    # grid_search = GridSearchCV(LogisticRegression(warm_start=True, tol=1e-4, solver='lbfgs'), param_grid=params, cv=3, verbose=1)
+    grid_search = GridSearchCV(MLPClassifier(), param_grid=params, cv=3, verbose=1)
     print("Starting grid search...")
 
     grid_search.fit(X_train, y_train)
@@ -292,6 +316,8 @@ def fine_tune_model_parameters(dataList, data_labels):
 
     return accuracy
 
+
+
 # ========================================
 # ===== Automatically Generate Model =====
 # ========================================
@@ -303,7 +329,7 @@ def auto_generate_model():
 # ===== Main =====
 # ================
 
-# print(auto_generate_model())
+print(auto_generate_model())
 # execute_model_MLP(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
 
-fine_tune_model_parameters(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
+# fine_tune_model_parameters(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
