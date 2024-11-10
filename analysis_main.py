@@ -1,15 +1,3 @@
-# ==============================================
-# ===== IMPORTANT INSTALLATION INFORMATION =====
-# ==============================================
-"""
-TODO
-1. check to see if we can integrate weights and bias
-2. figure out how we merge the nltk process to our logistic regression
-3. mlp classifier (neural network) 
-4. word embeddings to neural network
-
-"""
-
 # ==================================
 # ===== Necessary Dependencies =====
 # ==================================
@@ -20,7 +8,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.svm import LinearSVC
 from sklearn.svm import NuSVC
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score
 from collections import Counter
 from sklearn.naive_bayes import GaussianNB
 import os
@@ -28,6 +16,7 @@ import csv
 import math
 import random
 import pandas
+import re
 from secret import sigmoid
 import numpy as np
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -36,11 +25,16 @@ import ast
 from sklearn import metrics
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from joblib import parallel_backend
+from nltk.tokenize import TweetTokenizer
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+from nltk.corpus import stopwords
+import string
+import huggingface_hub
+import nltk
 
 # If you haven't downloaded these
-# import nltk
-# nltk.download('vader_lexicon')
-# nltk.download('punkt_tab')
+nltk.download('vader_lexicon')
+nltk.download('punkt_tab')
 
 # ================================================================
 # ===== General Formatting -- Data Settup and Initialization =====
@@ -149,7 +143,7 @@ def stochastic_gradient_descent(data, silent=True):
 
 def generate_experiment_data():
     """
-    function \n\n
+    REDACTED \n\n
     Param [type]:  \n\n
     Output [type]:
     """
@@ -175,31 +169,73 @@ def output_pos_neg_exp_data_sum(experiment_data):
     print(f"Positive: {count_positive}\t Negative: {count_negative}")
     print("Total reviews:", len(experiment_data))
 
-def generate_data_and_labels():
-    data = pandas.read_csv(os.path.join('.', 'data', 'reviews.csv'), encoding='latin-1', header=None, names=["Tweet", (0, 1)])
-    dataList = data.iloc[1:, 0].tolist()
-    return data, dataList
+def generate_data_and_labels(path):
+    data = pandas.read_csv(path, encoding='ISO-8859-1')
+    data = data.dropna(subset=['Text', 'Sentiment']) # Remove/drop NaN values
+    texts = data['Text'].tolist()
+    labels = data['Sentiment'].tolist()
+    return texts, labels
 
-def generate_data_labels(experiment_data):
-    data_labels = []
-    for e in experiment_data:
-        if e[1] == 1:
-            data_labels.append('pos')
-        else:
-            data_labels.append('neg')
-    return data_labels
+
+def clean_tweets(textList):
+    """Takes in raw text in form of list from pandas database"""
+    for i in range(len(textList)):
+        text = textList[i]
+        text = re.sub(r'^RT[\s]+', '', text)         # Remove "Old Style" Retweet
+        text = re.sub(r'https?:\/\/.*[\r\n]*', '', text) #Remove Hyperlinks
+        text = re.sub(r'http\S+', '', text)          # Remove URLs
+        text = re.sub(r'@\w+', '', text)             # Remove mentions
+        text = re.sub(r'#\w+', '', text)             # Remove hashtags
+        text = re.sub(r'\s+', ' ', text).strip()     # Remove excess whitespace
+        text = text.lower()
+        textList[i] = text
+        # print(text)
+    return textList
+
+def tokenize_tweets(textList):
+    """Takes in a cleaned set of tweets utilizing the clean_tweet function"""
+    tokenizer = TweetTokenizer(preserve_case=False, strip_handles=True,
+                               reduce_len=True)
+    stopwords_english = stopwords.words('english') 
+    stemmer = PorterStemmer()
+
+    # Tokenize the tweets
+    for i in range(len(textList)):
+        text = textList[i]
+        text_token = tokenizer.tokenize(text)
+
+        tweets_clean = []
+        for word in text_token:
+            if (word not in stopwords_english and  # remove stopwords
+                word not in string.punctuation):  # remove punctuation
+                tweets_clean.append(word)
+
+        # Stem the tweets
+        tweets_stem = []
+        for word in tweets_clean:
+            stem_word = stemmer.stem(word)  # stemming word
+            tweets_stem.append(stem_word)  # append to the list
+
+        textList[i] = (" ".join(tweets_stem)).strip()
+    return textList
 
 def execute_model(dataList, data_labels):
+    # Clean the data and tokenize data
+    print("Cleaning Data...")
+    dataList = tokenize_tweets(clean_tweets(dataList))
+
+    print("Initializing Count Vectorizer...")
     vectorizer = CountVectorizer(analyzer = 'word', lowercase = True, stop_words='english', ngram_range=(1, 3))
     features = vectorizer.fit_transform(dataList)
 
+    print("Splitting Data...")
     X_train, X_test, y_train, y_test  = train_test_split(
             features, 
             data_labels,
-            train_size=0.80, 
+            test_size=0.20, 
             random_state=1234)
 
-    print("Dataset Splitting Complete")
+    print("Dataset Splitting Complete!")
 
     # log_model = LogisticRegression(max_iter=500, penalty='elasticnet', C=10, solver='saga', l1_ratio=1)
 
@@ -229,9 +265,10 @@ def execute_model(dataList, data_labels):
 
     print(df)
 
-    return accuracy_score(y_test, y_pred)
+    return f1_score(y_test, y_pred)
 
 def execute_model_RF_with_dimensionality_reduction(dataList, data_labels):
+    dataList = tokenize_tweets(clean_tweets(dataList))
     from sklearn.pipeline import Pipeline
     from sklearn.decomposition import TruncatedSVD
     from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split
@@ -301,6 +338,7 @@ def execute_model_RF_with_dimensionality_reduction(dataList, data_labels):
     return accuracy_score(y_test, y_pred)
 
 def execute_model_MLP(dataList, data_labels):
+    dataList = tokenize_tweets(clean_tweets(dataList))
     X = dataList
     y = data_labels
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -395,15 +433,19 @@ def fine_tune_model_parameters(dataList, data_labels):
 # ===== Automatically Generate Model =====
 # ========================================
 
-def auto_generate_model():
-    return execute_model(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
+def auto_generate_model(path):
+    return execute_model(generate_data_and_labels(path)[0], generate_data_and_labels(path)[1])
 
 # ================
 # ===== Main =====
 # ================
 
-print(auto_generate_model())
-# execute_model_MLP(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
+path = os.path.join('.', 'data', 'reviews.csv')
 
-# fine_tune_model_parameters(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
-# execute_model_RF_with_dimensionality_reduction(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
+print(auto_generate_model(path))
+
+
+
+# execute_model_MLP(generate_data_and_labels()[0], generate_data_and_labels()[1])
+# fine_tune_model_parameters(generate_data_and_labels()[0], generate_data_and_labels()[1])
+# execute_model_RF_with_dimensionality_reduction(generate_data_and_labels()[0], generate_data_and_labels()[1])
