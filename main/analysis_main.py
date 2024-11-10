@@ -35,9 +35,13 @@ import zipfile
 import ast
 from sklearn import metrics
 from sklearn.neural_network import MLPClassifier, MLPRegressor
+from joblib import parallel_backend
 
+# If you haven't downloaded these
+# import nltk
 # nltk.download('vader_lexicon')
 # nltk.download('punkt_tab')
+
 # ================================================================
 # ===== General Formatting -- Data Settup and Initialization =====
 # ================================================================
@@ -227,6 +231,75 @@ def execute_model(dataList, data_labels):
 
     return accuracy_score(y_test, y_pred)
 
+def execute_model_RF_with_dimensionality_reduction(dataList, data_labels):
+    from sklearn.pipeline import Pipeline
+    from sklearn.decomposition import TruncatedSVD
+    from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split
+    from sklearn.metrics import accuracy_score, confusion_matrix
+    from sklearn.ensemble import RandomForestClassifier
+    pipeline = Pipeline([
+        ('vectorizer', CountVectorizer(
+            analyzer='word',
+            lowercase=True,
+            stop_words='english',
+            ngram_range=(1, 2)  # Reduced ngram range for less dimensionality and faster training
+        )),
+        ('svd', TruncatedSVD(n_components=100)),
+        ('classifier', RandomForestClassifier(random_state=42))
+    ], verbose=True)
+
+    param_grid = {
+        'classifier__n_estimators': [100],
+        'classifier__max_depth': [None],
+        'classifier__min_samples_split': [2]
+    }
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        dataList,
+        data_labels,
+        train_size=0.80,
+        random_state=1234
+    )
+
+    # Use thread-based parallelism
+    with parallel_backend('threading', n_jobs=1):
+        grid_search = GridSearchCV(
+            estimator=pipeline,
+            param_grid=param_grid,
+            cv=5,
+            scoring='accuracy',
+            n_jobs=1,
+            verbose=2
+        )
+        grid_search.fit(X_train, y_train)
+
+    best_pipeline = grid_search.best_estimator_
+
+    # Cross-validation without parallelism
+    cv_scores = cross_val_score(
+        best_pipeline, dataList, data_labels, cv=5, n_jobs=1, verbose=2
+    )
+
+    print("Cross-validation scores:", cv_scores)
+    print("Mean CV score:", cv_scores.mean())
+
+    y_pred = best_pipeline.predict(X_test)
+
+    print("Start prediction with Random Forest model (with dimensionality reduction)")
+
+    # Prediction matrix
+    cm = confusion_matrix(y_test, y_pred)
+    print(cm)
+    df = pandas.DataFrame(
+        cm,
+        index=['Antisemetic Actual', 'Not Antisemetic Actual'],
+        columns=['Antisemetic Predicted', 'Not Antisemetic Predicted']
+    )
+
+    print(df)
+
+    return accuracy_score(y_test, y_pred)
+
 def execute_model_MLP(dataList, data_labels):
     X = dataList
     y = data_labels
@@ -333,3 +406,4 @@ print(auto_generate_model())
 # execute_model_MLP(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
 
 # fine_tune_model_parameters(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
+# execute_model_RF_with_dimensionality_reduction(generate_data_and_labels()[1], generate_data_labels(generate_experiment_data()))
