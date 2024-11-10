@@ -169,11 +169,11 @@ def output_pos_neg_exp_data_sum(experiment_data):
     print(f"Positive: {count_positive}\t Negative: {count_negative}")
     print("Total reviews:", len(experiment_data))
 
-def generate_data_and_labels(path):
+def generate_data_and_labels(path, labels):
     data = pandas.read_csv(path, encoding='ISO-8859-1')
-    data = data.dropna(subset=['Text', 'Sentiment']) # Remove/drop NaN values
-    texts = data['Text'].tolist()
-    labels = data['Sentiment'].tolist()
+    data = data.dropna(subset=labels) # Remove/drop NaN values
+    texts = data[labels[0]].tolist()#[24000:26000]
+    labels = data[labels[1]].tolist()#[24000:26000]
     return texts, labels
 
 
@@ -433,16 +433,17 @@ def fine_tune_model_parameters(dataList, data_labels):
 # ===== Automatically Generate Model =====
 # ========================================
 
-def auto_generate_model(path):
-    return execute_model(generate_data_and_labels(path)[0], generate_data_and_labels(path)[1])
+def auto_generate_model(path, labels):
+    return execute_model(generate_data_and_labels(path, labels)[0], generate_data_and_labels(path, labels)[1])
 
 # ================
 # ===== Main =====
 # ================
 
 path = os.path.join('.', 'data', 'reviews.csv')
+labels = ['Text', 'Sentiment']
 
-print(auto_generate_model(path))
+print(auto_generate_model(path, labels))
 
 
 
