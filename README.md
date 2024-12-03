@@ -3,7 +3,7 @@ Repository for all code relating to the machine learning aspect of the 2024 IU D
 
 ## Important Information
 - All code is found in `analysis_main.py`
-- A specific version of `numpy` may be required depending on your system specifications. If you receive this error, please run the following command
+- A specific version of `numpy` may be required depending on your system specifications. If you receive this error, please run the following command in terminal
  > `pip install --force-reinstall -v "numpy==1.25.1`
 
 ## Installation Instructions
